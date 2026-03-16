@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorting Visualizer</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="icon.png">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* =========================================
+           CSS VARIABLES & RESET
+           ========================================= */
+        :root {
+            --bg-body: #09090b;
+            --bg-panel: #18181b;
+            --bg-element: #27272a;
+            --border: #3f3f46;
+            
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+            
+            --color-primary: #3b82f6;
+            --color-primary-hover: #60a5fa;
+            
+            /* Bar Colors */
+            --bar-default: #71717a;
+            --bar-compare: #ef4444; /* Red - comparing */
+            --bar-swap: #eab308;    /* Yellow - swapping/moving */
+            --bar-sorted: #10b981;  /* Green - fully sorted */
+            
+            --radius: 8px;
+            --transition: 0.2s ease;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* =========================================
+           HEADER
+           ========================================= */
+        header {
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .menu-btn {
+            background: none;
+            border: none;
+            display: none; /* Hidden on Desktop */
+            flex-direction: column;
+            gap: 5px;
+            padding: 5px;
+            cursor: pointer;
+            z-index: 110;
+        }
+
+        .menu-btn span {
+            display: block;
+            width: 25px;
+            height: 3px;
+            background-color: var(--text-main);
+            border-radius: 3px;
+            transition: var(--transition);
+        }
+
+        /* =========================================
+           LAYOUT: SIDEBAR & MAIN
+           ========================================= */
+        .app-container {
+            display: flex;
+            flex: 1;
+            position: relative;
+        }
+
+        main {
+            flex: 1;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            width: 100%;
+        }
+
+        .sidebar {
+            width: 340px;
+            background-color: var(--bg-panel);
+            border-left: 1px solid var(--border);
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.75rem;
+            flex-shrink: 0;
+            z-index: 90;
+            overflow-y: auto;
+        }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(3px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 80;
+        }
+
+        /* =========================================
+           VISUALIZER CONTAINER
+           ========================================= */
+        .visualizer-wrapper {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            height: 55vh;
+            min-height: 350px;
+            padding: 1rem 1rem 0 1rem;
+            display: flex;
+            align-items: flex-end; /* Important: Bars grow from bottom to top */
+            justify-content: center;
+            gap: 2px;
+        }
+
+        .bar {
+            background-color: var(--bar-default);
+            flex: 1;
+            border-radius: 4px 4px 0 0;
+            transition: background-color 0.1s; /* Only animate colors, height changes instantly for performance */
+        }
+
+        .bar.compare { background-color: var(--bar-compare); }
+        .bar.swap { background-color: var(--bar-swap); }
+        .bar.sorted { background-color: var(--bar-sorted); }
+
+        /* =========================================
+           CONTROLS (BUTTONS & STATS)
+           ========================================= */
+        .controls-board {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+
+        .buttons { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background-color: var(--bg-element);
+            color: var(--text-main);
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: inherit;
+        }
+
+        button:hover:not(:disabled) { background-color: var(--border); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        button.primary {
+            background-color: var(--text-main);
+            color: var(--bg-body);
+            border: none;
+        }
+        button.primary:hover:not(:disabled) { background-color: #d4d4d8; }
+
+        .stats {
+            display: flex;
+            gap: 2rem;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            background: var(--bg-panel);
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .stats span {
+            color: var(--text-main);
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            margin-left: 0.5rem;
+        }
+
+        .legend {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .legend-item { display: flex; align-items: center; gap: 0.5rem; }
+        .color-box { width: 14px; height: 14px; border-radius: 3px; }
+
+        /* =========================================
+           SIDEBAR FORMS (CUSTOM CSS)
+           ========================================= */
+        .form-group { display: flex; flex-direction: column; gap: 0.75rem; }
+
+        label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        /* CUSTOM SELECT MENU */
+        select {
+            width: 100%;
+            padding: 0.85rem 1rem;
+            background-color: var(--bg-element);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            border-radius: var(--radius);
+            font-family: inherit;
+            font-size: 0.95rem;
+            cursor: pointer;
+            outline: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            /* Custom Dropdown Arrow */
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23f4f4f5%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem top 50%;
+            background-size: 0.65rem auto;
+            transition: border-color var(--transition);
+        }
+        
+        select:hover:not(:disabled) { border-color: var(--color-primary); }
+        select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* CUSTOM RANGE SLIDERS */
+        .slider-header { display: flex; justify-content: space-between; align-items: center; }
+        .slider-val { font-weight: bold; color: var(--color-primary); font-size: 0.9rem; }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            padding: 10px 0;
+        }
+
+        input[type="range"]:focus { outline: none; }
+
+        /* WebKit (Chrome, Safari, Edge) */
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: var(--border);
+            border-radius: 3px;
+            transition: background 0.2s;
+        }
+        input[type="range"]:hover::-webkit-slider-runnable-track { background: #4f4f56; }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: var(--color-primary);
+            cursor: pointer;
+            margin-top: -6px; /* Centering */
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+            transition: transform 0.1s ease, background-color 0.2s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: var(--color-primary-hover);
+            box-shadow: 0 0 14px rgba(96, 165, 250, 0.6);
+        }
+
+        /* Mozilla Firefox */
+        input[type="range"]::-moz-range-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: var(--border);
+            border-radius: 3px;
+            transition: background 0.2s;
+        }
+        input[type="range"]:hover::-moz-range-track { background: #4f4f56; }
+        
+        input[type="range"]::-moz-range-thumb {
+            height: 18px;
+            width: 18px;
+            border: none;
+            border-radius: 50%;
+            background: var(--color-primary);
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+            transition: transform 0.1s ease, background-color 0.2s ease;
+        }
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.2);
+            background: var(--color-primary-hover);
+            box-shadow: 0 0 14px rgba(96, 165, 250, 0.6);
+        }
+
+        /* =========================================
+           MOBILE RESPONSIVENESS (MEDIA QUERIES)
+           ========================================= */
+        @media (max-width: 900px) {
+            .menu-btn { display: flex; } /* Show Burger Menu */
+            
+            .sidebar {
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                right: 0;
+                transform: translateX(100%); /* Hidden on mobile */
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .sidebar.open { transform: translateX(0); } /* Slide in */
+            .overlay.active { opacity: 1; pointer-events: all; } /* Enable overlay */
+
+            .controls-board { flex-direction: column; align-items: stretch; }
+            .buttons { justify-content: stretch; }
+            .buttons button { flex: 1; }
+            .stats { justify-content: space-between; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header>
+        <h1>Sorting Visualizer</h1>
+        <button class="menu-btn" id="menuBtn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </header>
+
+    <!-- MAIN APP AREA -->
+    <div class="app-container">
+        
+        <!-- OVERLAY FOR MOBILE -->
+        <div class="overlay" id="overlay"></div>
+
+        <!-- MAIN WORKSPACE -->
+        <main>
+            <!-- VISUALIZER GRAPH -->
+            <div class="visualizer-wrapper" id="visualizer">
+                <!-- Bars are generated via JS -->
+            </div>
+
+            <!-- CONTROLS & STATS -->
+            <div class="controls-board">
+                <div class="buttons">
+                    <button class="primary" id="btnStart">Start Sorting</button>
+                    <button id="btnPause" disabled>Pause</button>
+                    <button id="btnReset">Generate New Array</button>
+                </div>
+                <div class="stats">
+                    <div>Comparisons: <span id="statComp">0</span></div>
+                    <div>Swaps/Writes: <span id="statSwap">0</span></div>
+                </div>
+            </div>
+
+            <!-- LEGEND -->
+            <div class="legend">
+                <div class="legend-item"><div class="color-box" style="background: var(--bar-default);"></div> Unsorted</div>
+                <div class="legend-item"><div class="color-box" style="background: var(--bar-compare);"></div> Comparing</div>
+                <div class="legend-item"><div class="color-box" style="background: var(--bar-swap);"></div> Swapping/Moving</div>
+                <div class="legend-item"><div class="color-box" style="background: var(--bar-sorted);"></div> Sorted</div>
+            </div>
+        </main>
+
+        <!-- SIDEBAR SETTINGS (Always visible on right for PC, behind menu for Mobile) -->
+        <aside class="sidebar" id="sidebar">
+            <div class="form-group">
+                <label>Select Algorithm</label>
+                <select id="algoSelect">
+                    <option value="bubble">Bubble Sort</option>
+                    <option value="selection">Selection Sort</option>
+                    <option value="insertion">Insertion Sort</option>
+                    <option value="merge">Merge Sort</option>
+                    <option value="quick">Quick Sort</option>
+                    <option value="heap">Heap Sort</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <div class="slider-header">
+                    <label>Array Size (Elements)</label>
+                    <span class="slider-val" id="sizeVal">60</span>
+                </div>
+                <input type="range" id="sizeSlider" min="10" max="250" value="60">
+            </div>
+
+            <div class="form-group">
+                <div class="slider-header">
+                    <label>Animation Speed</label>
+                    <span class="slider-val" id="speedVal">Fast</span>
+                </div>
+                <input type="range" id="speedSlider" min="1" max="100" value="80">
+            </div>
+            
+            <div class="form-group" style="margin-top: 15px; background: var(--bg-element); padding: 15px; border-radius: var(--radius); border: 1px solid var(--border);">
+                <label style="color: var(--text-main); margin-bottom: 5px;">How it works:</label>
+                <p id="algoDesc" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;"></p>
+            </div>
+        </aside>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // ==========================================
+        // 1. GLOBAL STATE
+        // ==========================================
+        const state = {
+            array:[],
+            bars:[],
+            isSorting: false,
+            isPaused: false,
+            abortId: 0, // Critical for cleanly aborting on changes
+            comparisons: 0,
+            swaps: 0
+        };
+
+        const algoDescriptions = {
+            bubble: "Bubble Sort compares adjacent elements and swaps them if they are in the wrong order. Slow, but easy to understand. (Time Complexity: O(n²))",
+            selection: "Selection Sort repeatedly finds the minimum element from the unsorted part and puts it at the beginning. (Time Complexity: O(n²))",
+            insertion: "Insertion Sort builds the final sorted array one item at a time by shifting larger elements to the right to find the correct position. (Time Complexity: O(n²))",
+            merge: "Merge Sort recursively divides the array in half, sorts them, and merges them back together. Very efficient. (Time Complexity: O(n log n))",
+            quick: "Quick Sort picks a pivot, sorts smaller elements to the left and larger to the right. Often the fastest in practice. (Time Complexity: O(n log n))",
+            heap: "Heap Sort converts the array into a binary max-heap and repeatedly extracts the largest element. (Time Complexity: O(n log n))"
+        };
+
+        // ==========================================
+        // 2. DOM ELEMENT REFERENCES
+        // ==========================================
+        const DOM = {
+            visualizer: document.getElementById('visualizer'),
+            btnStart: document.getElementById('btnStart'),
+            btnPause: document.getElementById('btnPause'),
+            btnReset: document.getElementById('btnReset'),
+            statComp: document.getElementById('statComp'),
+            statSwap: document.getElementById('statSwap'),
+            sizeSlider: document.getElementById('sizeSlider'),
+            speedSlider: document.getElementById('speedSlider'),
+            sizeVal: document.getElementById('sizeVal'),
+            speedVal: document.getElementById('speedVal'),
+            algoSelect: document.getElementById('algoSelect'),
+            algoDesc: document.getElementById('algoDesc'),
+            menuBtn: document.getElementById('menuBtn'),
+            sidebar: document.getElementById('sidebar'),
+            overlay: document.getElementById('overlay')
+        };
+
+        // Custom Error to cleanly abort asynchronous algorithms
+        class AbortError extends Error {}
+
+        // ==========================================
+        // 3. HELPER FUNCTIONS (CORE LOGIC)
+        // ==========================================
+
+        function resetArray() {
+            // Abort all running sorting processes
+            state.abortId++;
+            state.isSorting = false;
+            state.isPaused = false;
+            state.comparisons = 0;
+            state.swaps = 0;
+            updateUI();
+
+            const size = parseInt(DOM.sizeSlider.value);
+            state.array =[];
+            state.bars =[];
+            DOM.visualizer.innerHTML = '';
+
+            for (let i = 0; i < size; i++) {
+                const val = Math.floor(Math.random() * 96) + 5; // Values between 5% and 100%
+                state.array.push(val);
+
+                const bar = document.createElement('div');
+                bar.classList.add('bar');
+                bar.style.height = `${val}%`;
+                DOM.visualizer.appendChild(bar);
+                state.bars.push(bar);
+            }
+        }
+
+        function updateUI() {
+            DOM.statComp.innerText = state.comparisons;
+            DOM.statSwap.innerText = state.swaps;
+
+            DOM.btnStart.disabled = state.isSorting && !state.isPaused;
+            DOM.btnPause.disabled = !state.isSorting;
+            DOM.btnPause.innerText = state.isPaused ? "Resume" : "Pause";
+            DOM.algoSelect.disabled = state.isSorting && !state.isPaused;
+        }
+
+        async function sleep(id) {
+            if (state.abortId !== id) throw new AbortError();
+
+            while (state.isPaused) {
+                if (state.abortId !== id) throw new AbortError();
+                await new Promise(r => requestAnimationFrame(r));
+            }
+
+            const speed = parseInt(DOM.speedSlider.value);
+            const delay = (100 - speed) * 3; // The lower the speed, the larger the delay
+
+            if (delay > 0) {
+                await new Promise(r => setTimeout(r, delay));
+            } else {
+                await new Promise(r => requestAnimationFrame(r));
+            }
+
+            if (state.abortId !== id) throw new AbortError();
+        }
+
+        function setBarColor(index, colorClass) {
+            if (state.bars[index]) {
+                state.bars[index].className = `bar ${colorClass}`;
+            }
+        }
+
+        async function swap(id, i, j) {
+            if (state.abortId !== id) throw new AbortError();
+            state.swaps++;
+            updateUI();
+
+            let temp = state.array[i];
+            state.array[i] = state.array[j];
+            state.array[j] = temp;
+
+            state.bars[i].style.height = `${state.array[i]}%`;
+            state.bars[j].style.height = `${state.array[j]}%`;
+        }
+
+        async function write(id, index, value) {
+            if (state.abortId !== id) throw new AbortError();
+            state.swaps++;
+            updateUI();
+
+            state.array[index] = value;
+            state.bars[index].style.height = `${value}%`;
+        }
+
+        async function markAllSorted(id) {
+            for (let i = 0; i < state.array.length; i++) {
+                if (state.abortId !== id) return;
+                setBarColor(i, 'sorted');
+                await new Promise(r => setTimeout(r, Math.max(2, 200 / state.array.length)));
+            }
+        }
+
+        // ==========================================
+        // 4. SORTING ALGORITHMS
+        // ==========================================
+        const algorithms = {
+            async bubble(id) {
+                const n = state.array.length;
+                for (let i = 0; i < n - 1; i++) {
+                    let swapped = false;
+                    for (let j = 0; j < n - i - 1; j++) {
+                        state.comparisons++;
+                        updateUI();
+                        
+                        setBarColor(j, 'compare');
+                        setBarColor(j + 1, 'compare');
+                        await sleep(id);
+
+                        if (state.array[j] > state.array[j + 1]) {
+                            setBarColor(j, 'swap');
+                            setBarColor(j + 1, 'swap');
+                            await sleep(id);
+                            await swap(id, j, j + 1);
+                            swapped = true;
+                        }
+                        setBarColor(j, '');
+                        setBarColor(j + 1, '');
+                    }
+                    setBarColor(n - i - 1, 'sorted');
+                    if (!swapped) break;
+                }
+            },
+
+            async selection(id) {
+                const n = state.array.length;
+                for (let i = 0; i < n; i++) {
+                    let minIndex = i;
+                    setBarColor(minIndex, 'swap');
+
+                    for (let j = i + 1; j < n; j++) {
+                        state.comparisons++;
+                        updateUI();
+                        setBarColor(j, 'compare');
+                        await sleep(id);
+
+                        if (state.array[j] < state.array[minIndex]) {
+                            if (minIndex !== i) setBarColor(minIndex, '');
+                            minIndex = j;
+                            setBarColor(minIndex, 'swap');
+                        } else {
+                            setBarColor(j, '');
+                        }
+                    }
+
+                    if (minIndex !== i) await swap(id, i, minIndex);
+                    setBarColor(minIndex, '');
+                    setBarColor(i, 'sorted');
+                }
+            },
+
+            async insertion(id) {
+                const n = state.array.length;
+                setBarColor(0, 'sorted');
+                
+                for (let i = 1; i < n; i++) {
+                    let key = state.array[i];
+                    let j = i - 1;
+
+                    setBarColor(i, 'swap');
+                    await sleep(id);
+
+                    while (j >= 0) {
+                        state.comparisons++;
+                        updateUI();
+                        setBarColor(j, 'compare');
+                        await sleep(id);
+
+                        if (state.array[j] > key) {
+                            await write(id, j + 1, state.array[j]);
+                            setBarColor(j, 'sorted');
+                            j--;
+                        } else {
+                            setBarColor(j, 'sorted');
+                            break;
+                        }
+                    }
+                    await write(id, j + 1, key);
+                    setBarColor(j + 1, 'sorted');
+                    for(let k = 0; k <= i; k++) setBarColor(k, 'sorted');
+                }
+            },
+
+            async merge(id) {
+                async function mergeLogic(left, mid, right) {
+                    let n1 = mid - left + 1;
+                    let n2 = right - mid;
+                    let L = new Array(n1);
+                    let R = new Array(n2);
+
+                    for (let i = 0; i < n1; i++) L[i] = state.array[left + i];
+                    for (let j = 0; j < n2; j++) R[j] = state.array[mid + 1 + j];
+
+                    let i = 0, j = 0, k = left;
+
+                    while (i < n1 && j < n2) {
+                        state.comparisons++;
+                        updateUI();
+                        setBarColor(k, 'compare');
+                        await sleep(id);
+
+                        if (L[i] <= R[j]) {
+                            await write(id, k, L[i]);
+                            i++;
+                        } else {
+                            await write(id, k, R[j]);
+                            j++;
+                        }
+                        setBarColor(k, '');
+                        k++;
+                    }
+
+                    while (i < n1) {
+                        setBarColor(k, 'swap');
+                        await sleep(id);
+                        await write(id, k, L[i]);
+                        setBarColor(k, '');
+                        i++; k++;
+                    }
+
+                    while (j < n2) {
+                        setBarColor(k, 'swap');
+                        await sleep(id);
+                        await write(id, k, R[j]);
+                        setBarColor(k, '');
+                        j++; k++;
+                    }
+                }
+
+                async function mergeSortRecursive(left, right) {
+                    if (left >= right) return;
+                    let mid = left + Math.floor((right - left) / 2);
+                    await mergeSortRecursive(left, mid);
+                    await mergeSortRecursive(mid + 1, right);
+                    await mergeLogic(left, mid, right);
+                }
+
+                await mergeSortRecursive(0, state.array.length - 1);
+            },
+
+            async quick(id) {
+                async function partition(low, high) {
+                    let pivot = state.array[high];
+                    setBarColor(high, 'swap'); // Mark pivot
+                    let i = low - 1;
+
+                    for (let j = low; j < high; j++) {
+                        state.comparisons++;
+                        updateUI();
+                        setBarColor(j, 'compare');
+                        await sleep(id);
+
+                        if (state.array[j] < pivot) {
+                            i++;
+                            if (i !== j) await swap(id, i, j);
+                        }
+                        setBarColor(j, '');
+                    }
+                    await swap(id, i + 1, high);
+                    setBarColor(high, '');
+                    return i + 1;
+                }
+
+                async function quickSortRecursive(low, high) {
+                    if (low < high) {
+                        let pi = await partition(low, high);
+                        setBarColor(pi, 'sorted');
+                        await quickSortRecursive(low, pi - 1);
+                        await quickSortRecursive(pi + 1, high);
+                    } else if (low === high) {
+                        setBarColor(low, 'sorted');
+                    }
+                }
+
+                await quickSortRecursive(0, state.array.length - 1);
+            },
+
+            async heap(id) {
+                const n = state.array.length;
+
+                async function heapify(n, i) {
+                    let largest = i;
+                    let l = 2 * i + 1;
+                    let r = 2 * i + 2;
+
+                    if (l < n) {
+                        state.comparisons++;
+                        updateUI();
+                        setBarColor(l, 'compare');
+                        await sleep(id);
+                        if (state.array[l] > state.array[largest]) largest = l;
+                        setBarColor(l, '');
+                    }
+
+                    if (r < n) {
+                        state.comparisons++;
+                        updateUI();
+                        setBarColor(r, 'compare');
+                        await sleep(id);
+                        if (state.array[r] > state.array[largest]) largest = r;
+                        setBarColor(r, '');
+                    }
+
+                    if (largest !== i) {
+                        setBarColor(i, 'swap');
+                        setBarColor(largest, 'swap');
+                        await sleep(id);
+                        await swap(id, i, largest);
+                        setBarColor(i, '');
+                        setBarColor(largest, '');
+                        await heapify(n, largest);
+                    }
+                }
+
+                for (let i = Math.floor(n / 2) - 1; i >= 0; i--) {
+                    await heapify(n, i);
+                }
+
+                for (let i = n - 1; i > 0; i--) {
+                    await swap(id, 0, i);
+                    setBarColor(i, 'sorted');
+                    await heapify(i, 0);
+                }
+                setBarColor(0, 'sorted');
+            }
+        };
+
+        // ==========================================
+        // 5. MAIN CONTROLLER & EVENTS
+        // ==========================================
+        
+        async function startSorting() {
+            if (state.isSorting) return;
+
+            state.isSorting = true;
+            state.isPaused = false;
+            state.abortId++;
+            const currentId = state.abortId;
+            updateUI();
+
+            // Reset colors before starting
+            state.bars.forEach(bar => bar.className = 'bar');
+
+            try {
+                const algo = DOM.algoSelect.value;
+                await algorithms[algo](currentId);
+                await markAllSorted(currentId);
+            } catch (e) {
+                if (e instanceof AbortError) {
+                    // Expected abort on parameter changes, do not log as error
+                    console.log("Sorting aborted cleanly.");
+                } else {
+                    console.error("Error:", e);
+                }
+            } finally {
+                if (state.abortId === currentId) {
+                    state.isSorting = false;
+                    updateUI();
+                }
+            }
+        }
+
+        // Setup on DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', () => {
+            // Mobile Menu (Sidebar Drawer)
+            const toggleMenu = () => {
+                DOM.sidebar.classList.toggle('open');
+                DOM.overlay.classList.toggle('active');
+            };
+            DOM.menuBtn.addEventListener('click', toggleMenu);
+            DOM.overlay.addEventListener('click', toggleMenu);
+
+            // Button Events
+            DOM.btnStart.addEventListener('click', startSorting);
+            DOM.btnPause.addEventListener('click', () => {
+                state.isPaused = !state.isPaused;
+                updateUI();
+            });
+            DOM.btnReset.addEventListener('click', resetArray);
+
+            // Slider Events
+            DOM.sizeSlider.addEventListener('input', (e) => {
+                DOM.sizeVal.innerText = e.target.value;
+                resetArray(); // Rebuild array instantly!
+            });
+
+            DOM.speedSlider.addEventListener('input', (e) => {
+                let val = e.target.value;
+                if (val > 85) DOM.speedVal.innerText = "Maximum";
+                else if (val > 60) DOM.speedVal.innerText = "Fast";
+                else if (val > 30) DOM.speedVal.innerText = "Normal";
+                else DOM.speedVal.innerText = "Slow";
+                // Speed applies dynamically during the next "await sleep(id)" cycle
+            });
+
+            // Select (Algorithm) Event
+            DOM.algoSelect.addEventListener('change', () => {
+                DOM.algoDesc.innerText = algoDescriptions[DOM.algoSelect.value];
+                resetArray();
+            });
+
+            // Initialization
+            DOM.algoDesc.innerText = algoDescriptions[DOM.algoSelect.value];
+            resetArray();
+        });
+    </script>
+</body>
+</html>
